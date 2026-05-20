@@ -33,28 +33,37 @@
 
     <article class="tc3d-panel">
       <div class="mb-4">
-        <p class="tc3d-label">Entrada rapida</p>
-        <h2 class="text-xl font-semibold">Anadir tareas como Trello</h2>
+        <p class="tc3d-label">Checklist</p>
+        <h2 class="text-xl font-semibold">Lista rapida</h2>
       </div>
-      <form id="project-task-form" class="space-y-3">
-        <input
-          id="quick-task-input"
-          class="tc3d-input"
-          type="text"
-          name="title"
-          placeholder="Escribe una tarea y pulsa Enter"
-          autocomplete="off"
-          required
-        />
-        <select class="tc3d-input" name="status" required>
-          {% for status_name in detail.task_columns %}
-          <option value="{{ status_name }}">{{ status_name }}</option>
-          {% endfor %}
-        </select>
-        <textarea class="tc3d-input min-h-24" name="notes" placeholder="Notas de la tarea"></textarea>
-        <button class="tc3d-button w-full" type="submit">Crear tarjeta</button>
-        <p class="text-xs text-slate-500">Pulsa `Enter` en el titulo para crear rapido y seguir escribiendo.</p>
-      </form>
+      <div class="mb-4">
+        <div class="mb-2 h-2 overflow-hidden rounded-full bg-slate-800">
+          {% set total_tasks = detail.task_list|length %}
+          {% set done_tasks = detail.task_list|selectattr('status', 'equalto', 'Hecho')|list|length %}
+          {% set progress = ((done_tasks / total_tasks) * 100) if total_tasks else 0 %}
+          <div class="h-full rounded-full bg-cyan-500" style="width: {{ progress }}%;"></div>
+        </div>
+        <p class="text-xs text-slate-500">{{ done_tasks }} de {{ total_tasks }} completadas</p>
+      </div>
+
+      <div id="checklist-items" class="space-y-2">
+        {% for task in detail.task_list %}
+        <label class="tc3d-check-item {% if task.status == 'Hecho' %}tc3d-check-item-done{% endif %}" data-task-id="{{ task.id }}">
+          <input
+            class="checklist-toggle h-4 w-4 accent-cyan-400"
+            type="checkbox"
+            data-task-id="{{ task.id }}"
+            {% if task.status == 'Hecho' %}checked{% endif %}
+          />
+          <span class="checklist-text">{{ task.title }}</span>
+        </label>
+        {% endfor %}
+      </div>
+
+      <div id="quick-add-wrap" class="mt-4">
+        <button id="show-quick-add" type="button" class="tc3d-ghost-button">Anade un elemento</button>
+        <div id="quick-add-list" class="mt-3 hidden space-y-2"></div>
+      </div>
     </article>
   </aside>
 
@@ -129,10 +138,9 @@
 </main>
 
 <script>
-  const projectTaskForm = document.getElementById("project-task-form");
-  const quickTaskInput = document.getElementById("quick-task-input");
-  const notesInput = projectTaskForm.querySelector('[name="notes"]');
-  const statusInput = projectTaskForm.querySelector('[name="status"]');
+  const checklistItems = document.getElementById("checklist-items");
+  const showQuickAddButton = document.getElementById("show-quick-add");
+  const quickAddList = document.getElementById("quick-add-list");
 
   function bindTaskStatusSelect(select) {
     select.addEventListener("change", async () => {
@@ -194,8 +202,31 @@
     countNode.textContent = String(Number(countNode.textContent || "0") + 1);
   }
 
-  async function submitQuickTask(keepWriting = false) {
-    const formData = new FormData(projectTaskForm);
+  function buildChecklistItem(task) {
+    const label = document.createElement("label");
+    label.className = "tc3d-check-item";
+    label.dataset.taskId = task.id;
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "checklist-toggle h-4 w-4 accent-cyan-400";
+    checkbox.dataset.taskId = task.id;
+
+    const text = document.createElement("span");
+    text.className = "checklist-text";
+    text.textContent = task.title;
+
+    label.appendChild(checkbox);
+    label.appendChild(text);
+    bindChecklistToggle(checkbox);
+    return label;
+  }
+
+  async function submitQuickTask(title, input) {
+    const formData = new FormData();
+    formData.append("title", title);
+    formData.append("status", "Por hacer");
+    formData.append("notes", "");
     const response = await fetch("/api/projects/{{ detail.project.id }}/tasks", {
       method: "POST",
       body: formData,
@@ -203,38 +234,81 @@
 
     if (response.ok) {
       const data = await response.json();
-      if (keepWriting) {
-        const list = document.querySelector(`.task-column-list[data-column-name="${data.task.status}"]`);
-        if (list) {
-          list.appendChild(buildTaskCard(data.task));
-          incrementColumnCount(data.task.status);
-        }
-        const currentStatus = statusInput.value;
-        projectTaskForm.reset();
-        statusInput.value = currentStatus;
-        notesInput.value = "";
-        quickTaskInput.focus();
-      } else {
-        window.location.reload();
+      const list = document.querySelector(`.task-column-list[data-column-name="${data.task.status}"]`);
+      if (list) {
+        list.appendChild(buildTaskCard(data.task));
+        incrementColumnCount(data.task.status);
       }
+      checklistItems.appendChild(buildChecklistItem(data.task));
+      input.value = "";
+      input.focus();
     }
   }
 
-  projectTaskForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    await submitQuickTask(false);
-  });
+  function bindChecklistToggle(checkbox) {
+    checkbox.addEventListener("change", async () => {
+      const formData = new FormData();
+      formData.append("status", checkbox.checked ? "Hecho" : "Por hacer");
+      await fetch(`/api/project-tasks/${checkbox.dataset.taskId}/status`, {
+        method: "POST",
+        body: formData,
+      });
 
-  quickTaskInput.addEventListener("keydown", async (event) => {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      if (!quickTaskInput.value.trim()) {
-        return;
+      const item = checkbox.closest(".tc3d-check-item");
+      item.classList.toggle("tc3d-check-item-done", checkbox.checked);
+    });
+  }
+
+  function createQuickAddInput(focus = false) {
+    const row = document.createElement("div");
+    row.className = "tc3d-quick-row";
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "tc3d-quick-input";
+    input.placeholder = "Escribe una tarea y pulsa Enter";
+    input.autocomplete = "off";
+
+    row.appendChild(input);
+    quickAddList.appendChild(row);
+
+    input.addEventListener("keydown", async (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        const title = input.value.trim();
+        if (!title) {
+          return;
+        }
+
+        const isLastInput = quickAddList.lastElementChild === row;
+        await submitQuickTask(title, input);
+        if (isLastInput) {
+          createQuickAddInput(true);
+        }
       }
-      await submitQuickTask(true);
+    });
+
+    input.addEventListener("blur", () => {
+      if (!input.value.trim() && quickAddList.children.length > 1) {
+        row.remove();
+      }
+    });
+
+    if (focus) {
+      input.focus();
+    }
+  }
+
+  showQuickAddButton.addEventListener("click", () => {
+    quickAddList.classList.remove("hidden");
+    if (!quickAddList.children.length) {
+      createQuickAddInput(true);
+    } else {
+      quickAddList.lastElementChild.querySelector("input")?.focus();
     }
   });
 
   document.querySelectorAll(".project-task-status-form select").forEach(bindTaskStatusSelect);
+  document.querySelectorAll(".checklist-toggle").forEach(bindChecklistToggle);
 </script>
 {% endblock %}

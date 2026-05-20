@@ -128,3 +128,59 @@ body {
   color: rgb(165 243 252);
   white-space: nowrap;
 }
+
+.tc3d-check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  border-radius: 0.9rem;
+  padding: 0.45rem 0.35rem;
+  color: rgb(226 232 240);
+}
+
+.tc3d-check-item:hover {
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.tc3d-check-item-done .checklist-text {
+  color: rgb(100 116 139);
+  text-decoration: line-through;
+}
+
+.checklist-text {
+  line-height: 1.45;
+}
+
+.tc3d-ghost-button {
+  border: 1px solid rgba(51, 65, 85, 1);
+  border-radius: 0.8rem;
+  background: rgba(15, 23, 42, 0.6);
+  color: rgb(226 232 240);
+  padding: 0.7rem 0.95rem;
+  cursor: pointer;
+}
+
+.tc3d-ghost-button:hover {
+  border-color: rgba(34, 211, 238, 0.3);
+  background: rgba(8, 47, 73, 0.42);
+}
+
+.tc3d-quick-row {
+  border-radius: 0.9rem;
+  border: 1px solid rgba(30, 41, 59, 0.9);
+  background: rgba(2, 6, 23, 0.78);
+  padding: 0.25rem 0.65rem;
+}
+
+.tc3d-quick-input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: rgb(226 232 240);
+  padding: 0.6rem 0;
+  outline: none;
+}
+
+.tc3d-quick-input::placeholder {
+  color: rgb(100 116 139);
+}

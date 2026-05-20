@@ -127,6 +127,7 @@ def fetch_project_detail(project_id: int) -> dict:
 
     return {
         "project": dict(project),
+        "task_list": task_list,
         "task_board": task_board,
         "task_columns": TASK_COLUMNS,
     }
