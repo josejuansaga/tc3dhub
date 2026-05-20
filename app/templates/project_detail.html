@@ -18,11 +18,16 @@
           <option value="{{ status_name }}" {% if detail.project.status == status_name %}selected{% endif %}>{{ status_name }}</option>
           {% endfor %}
         </select>
-        <input class="tc3d-input" type="date" name="delivery_date" value="{{ detail.project.delivery_date }}" required />
+        <div class="tc3d-card">
+          <p class="tc3d-label">Creado</p>
+          <p class="mt-2 text-sm text-slate-300">{{ detail.project.created_at }}</p>
+        </div>
+        <input class="tc3d-input" type="date" name="due_date" value="{{ detail.project.due_date }}" />
         <input class="tc3d-input" type="number" step="0.01" name="amount" value="{{ detail.project.amount }}" required />
         <input class="tc3d-input" type="text" name="folder_path" value="{{ detail.project.folder_path }}" placeholder="Ruta o enlace carpeta" />
         <textarea class="tc3d-input min-h-24" name="description" placeholder="Descripcion">{{ detail.project.description }}</textarea>
         <textarea class="tc3d-input min-h-24" name="notes" placeholder="Notas">{{ detail.project.notes }}</textarea>
+        <p class="text-xs text-slate-500">La entrega es opcional. Si no pones fecha, el proyecto sigue sin entrega definida.</p>
         <button class="tc3d-button w-full" type="submit">Guardar cambios</button>
       </form>
 
@@ -116,8 +121,12 @@
           <p class="mt-2 text-sm text-slate-300">{{ detail.project.client }}</p>
         </div>
         <div class="tc3d-card">
+          <p class="tc3d-label">Creado</p>
+          <p class="mt-2 text-sm text-slate-300">{{ detail.project.created_at }}</p>
+        </div>
+        <div class="tc3d-card">
           <p class="tc3d-label">Entrega</p>
-          <p class="mt-2 text-sm text-slate-300">{{ detail.project.delivery_date }}</p>
+          <p class="mt-2 text-sm text-slate-300">{{ detail.project.due_date or "Sin fecha" }}</p>
         </div>
         <div class="tc3d-card">
           <p class="tc3d-label">Estado</p>

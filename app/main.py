@@ -1,4 +1,5 @@
 import os
+from datetime import date
 
 from anthropic import Anthropic
 from fastapi import FastAPI, Form, HTTPException, Request
@@ -36,7 +37,7 @@ def fetch_dashboard_data() -> dict:
             "SELECT * FROM production_metrics WHERE id = 1"
         ).fetchone()
         projects = connection.execute(
-            "SELECT * FROM projects ORDER BY delivery_date ASC"
+            "SELECT * FROM projects ORDER BY COALESCE(NULLIF(due_date, ''), '9999-12-31') ASC, id DESC"
         ).fetchall()
         links = connection.execute(
             "SELECT * FROM quick_links ORDER BY id ASC"
@@ -56,6 +57,7 @@ def fetch_dashboard_data() -> dict:
             "project_name": project["project_name"],
             "client": project["client"],
             "delivery_date": project["delivery_date"],
+            "due_date": project["due_date"],
         }
         for project in projects[:4]
     ]
@@ -85,7 +87,7 @@ def fetch_dashboard_data() -> dict:
 def fetch_projects_data() -> dict:
     with get_connection() as connection:
         projects = connection.execute(
-            "SELECT * FROM projects ORDER BY delivery_date ASC, id DESC"
+            "SELECT * FROM projects ORDER BY COALESCE(NULLIF(due_date, ''), '9999-12-31') ASC, id DESC"
         ).fetchall()
 
     project_list = [dict(project) for project in projects]
@@ -184,29 +186,32 @@ def create_project(
     client: str = Form(...),
     project_name: str = Form(...),
     status: str = Form(...),
-    delivery_date: str = Form(...),
     amount: float = Form(...),
+    due_date: str = Form(""),
     notes: str = Form(""),
     description: str = Form(""),
     folder_path: str = Form(""),
 ):
+    created_at = date.today().isoformat()
     with get_connection() as connection:
         cursor = connection.cursor()
         cursor.execute(
             """
             INSERT INTO projects (
-                client, project_name, status, delivery_date, amount, notes, description, folder_path
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                client, project_name, status, delivery_date, amount, notes, description, folder_path, created_at, due_date
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 client,
                 project_name,
                 status,
-                delivery_date,
+                due_date,
                 amount,
                 notes,
                 description,
                 folder_path,
+                created_at,
+                due_date,
             ),
         )
         project_id = cursor.lastrowid
@@ -231,8 +236,8 @@ def update_project(
     client: str = Form(...),
     project_name: str = Form(...),
     status: str = Form(...),
-    delivery_date: str = Form(...),
     amount: float = Form(...),
+    due_date: str = Form(""),
     notes: str = Form(""),
     description: str = Form(""),
     folder_path: str = Form(""),
@@ -249,13 +254,17 @@ def update_project(
                 client,
                 project_name,
                 status,
-                delivery_date,
+                due_date,
                 amount,
                 notes,
                 description,
                 folder_path,
                 project_id,
             ),
+        )
+        connection.execute(
+            "UPDATE projects SET due_date = ? WHERE id = ?",
+            (due_date, project_id),
         )
         connection.commit()
     return RedirectResponse(url=f"/projects/{project_id}", status_code=303)

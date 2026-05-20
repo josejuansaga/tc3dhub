@@ -1,6 +1,7 @@
 import os
 import sqlite3
 from contextlib import contextmanager
+from datetime import datetime
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -84,6 +85,22 @@ def ensure_project_columns(cursor: sqlite3.Cursor) -> None:
         cursor.execute("ALTER TABLE projects ADD COLUMN description TEXT DEFAULT ''")
     if "folder_path" not in columns:
         cursor.execute("ALTER TABLE projects ADD COLUMN folder_path TEXT DEFAULT ''")
+    if "created_at" not in columns:
+        cursor.execute("ALTER TABLE projects ADD COLUMN created_at TEXT DEFAULT ''")
+    if "due_date" not in columns:
+        cursor.execute("ALTER TABLE projects ADD COLUMN due_date TEXT DEFAULT ''")
+    cursor.execute(
+        """
+        UPDATE projects
+        SET created_at = COALESCE(NULLIF(created_at, ''), date('now'))
+        """
+    )
+    cursor.execute(
+        """
+        UPDATE projects
+        SET due_date = COALESCE(NULLIF(due_date, ''), delivery_date)
+        """
+    )
 
 
 def seed_data(connection: sqlite3.Connection) -> None:
@@ -93,8 +110,8 @@ def seed_data(connection: sqlite3.Connection) -> None:
         cursor.executemany(
             """
             INSERT INTO projects (
-                client, project_name, status, delivery_date, amount, notes, description, folder_path
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                client, project_name, status, delivery_date, amount, notes, description, folder_path, created_at, due_date
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -106,6 +123,8 @@ def seed_data(connection: sqlite3.Connection) -> None:
                     "Faltan 2 renders exteriores",
                     "Proyecto de visualizacion interior y exterior para vivienda piloto.",
                     "file:///D:/Proyectos3D/Rivera/Vivienda-piloto",
+                    "2026-05-20",
+                    "2026-05-24",
                 ),
                 (
                     "Estudio Armonia",
@@ -116,6 +135,8 @@ def seed_data(connection: sqlite3.Connection) -> None:
                     "Esperando feedback final",
                     "Imagenes de cocina premium para aprobacion comercial.",
                     "file:///D:/Proyectos3D/Armonia/Cocina-premium",
+                    "2026-05-20",
+                    "2026-05-22",
                 ),
                 (
                     "Habita Norte",
@@ -126,6 +147,8 @@ def seed_data(connection: sqlite3.Connection) -> None:
                     "Presupuesto aprobado esta semana",
                     "Recorrido para promocion de adosados con enfoque comercial.",
                     "file:///D:/Proyectos3D/HabitaNorte/Tour-adosados",
+                    "2026-05-20",
+                    "2026-05-29",
                 ),
             ],
         )
