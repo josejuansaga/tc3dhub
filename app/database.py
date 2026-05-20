@@ -137,6 +137,12 @@ def ensure_client_links(cursor: sqlite3.Cursor) -> None:
     if "client_id" not in columns:
         cursor.execute("ALTER TABLE projects ADD COLUMN client_id INTEGER")
 
+    client_columns = {
+        row[1] for row in cursor.execute("PRAGMA table_info(clients)").fetchall()
+    }
+    if "cif" not in client_columns:
+        cursor.execute("ALTER TABLE clients ADD COLUMN cif TEXT DEFAULT ''")
+
     project_clients = cursor.execute(
         "SELECT DISTINCT client FROM projects WHERE COALESCE(client, '') != ''"
     ).fetchall()

@@ -17,7 +17,12 @@
           <option value="{{ client.id }}" {% if detail.project.client_id == client.id or detail.project.linked_client_id == client.id %}selected{% endif %}>{{ client.name }}</option>
           {% endfor %}
         </select>
-        <input class="tc3d-input" type="text" name="client" value="{{ detail.project.client }}" required />
+        <input class="tc3d-input" list="detail-client-name-list" type="text" name="client" value="{{ detail.project.client }}" required />
+        <datalist id="detail-client-name-list">
+          {% for client in detail.clients %}
+          <option value="{{ client.name }}"></option>
+          {% endfor %}
+        </datalist>
         <input class="tc3d-input" type="text" name="project_name" value="{{ detail.project.project_name }}" required />
         <select class="tc3d-input" name="status" required>
           {% for status_name in ['Pendiente inicio', 'En produccion', 'Revision cliente', 'Completado'] %}

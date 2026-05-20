@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import date
 
 from anthropic import Anthropic
@@ -26,6 +27,10 @@ TASK_COLUMNS = [
     "Bloqueado",
     "Hecho",
 ]
+
+
+def normalize_client_name(value: str) -> str:
+    return re.sub(r"\s+", " ", value.strip().casefold())
 
 
 def fetch_clients_simple() -> list[dict]:
@@ -206,6 +211,25 @@ def resolve_client_data(connection, client_id: int | None, client_name: str) -> 
         ).fetchone()
         if client:
             return client["id"], client["name"]
+
+    if normalized_name:
+        clients = connection.execute(
+            "SELECT id, name FROM clients ORDER BY name COLLATE NOCASE ASC"
+        ).fetchall()
+        exact_target = normalize_client_name(normalized_name)
+        for client in clients:
+            if normalize_client_name(client["name"]) == exact_target:
+                return client["id"], client["name"]
+
+        partial_matches = [
+            client
+            for client in clients
+            if exact_target in normalize_client_name(client["name"])
+            or normalize_client_name(client["name"]) in exact_target
+        ]
+        if len(partial_matches) == 1:
+            return partial_matches[0]["id"], partial_matches[0]["name"]
+
     return (None, normalized_name)
 
 
@@ -383,6 +407,7 @@ def update_project(
 @app.post("/api/clients")
 def create_client(
     name: str = Form(...),
+    cif: str = Form(""),
     contact_person: str = Form(""),
     email: str = Form(""),
     phone: str = Form(""),
@@ -396,10 +421,10 @@ def create_client(
         cursor.execute(
             """
             INSERT INTO clients (
-                name, contact_person, email, phone, city, gallery_url, notes, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                name, cif, contact_person, email, phone, city, gallery_url, notes, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (name, contact_person, email, phone, city, gallery_url, notes, created_at),
+            (name, cif, contact_person, email, phone, city, gallery_url, notes, created_at),
         )
         client_id = cursor.lastrowid
         connection.commit()
@@ -410,6 +435,7 @@ def create_client(
 def update_client(
     client_id: int,
     name: str = Form(...),
+    cif: str = Form(""),
     contact_person: str = Form(""),
     email: str = Form(""),
     phone: str = Form(""),
@@ -421,10 +447,10 @@ def update_client(
         connection.execute(
             """
             UPDATE clients
-            SET name = ?, contact_person = ?, email = ?, phone = ?, city = ?, gallery_url = ?, notes = ?
+            SET name = ?, cif = ?, contact_person = ?, email = ?, phone = ?, city = ?, gallery_url = ?, notes = ?
             WHERE id = ?
             """,
-            (name, contact_person, email, phone, city, gallery_url, notes, client_id),
+            (name, cif, contact_person, email, phone, city, gallery_url, notes, client_id),
         )
         connection.execute(
             "UPDATE projects SET client = ? WHERE client_id = ?",

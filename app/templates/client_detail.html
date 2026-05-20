@@ -11,6 +11,7 @@
       </div>
       <form action="/api/clients/{{ detail.client.id }}" method="post" class="space-y-3">
         <input class="tc3d-input" type="text" name="name" value="{{ detail.client.name }}" required />
+        <input class="tc3d-input" type="text" name="cif" value="{{ detail.client.cif }}" placeholder="CIF" />
         <input class="tc3d-input" type="text" name="contact_person" value="{{ detail.client.contact_person }}" placeholder="Persona de contacto" />
         <input class="tc3d-input" type="email" name="email" value="{{ detail.client.email }}" placeholder="Email" />
         <input class="tc3d-input" type="text" name="phone" value="{{ detail.client.phone }}" placeholder="Telefono" />
@@ -53,6 +54,12 @@
         </div>
         {% endif %}
       </div>
+      {% if detail.client.cif %}
+      <div class="mt-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-300">
+        <span class="tc3d-label">CIF</span>
+        <div class="mt-2">{{ detail.client.cif }}</div>
+      </div>
+      {% endif %}
     </article>
   </section>
 </main>
