@@ -119,6 +119,20 @@ body {
   border-color: rgba(34, 211, 238, 0.24);
 }
 
+.tc3d-board-card {
+  cursor: grab;
+}
+
+.tc3d-dragging {
+  opacity: 0.45;
+  cursor: grabbing;
+}
+
+.tc3d-drop-active {
+  border-color: rgba(34, 211, 238, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.18);
+}
+
 .tc3d-chip {
   border-radius: 999px;
   border: 1px solid rgba(34, 211, 238, 0.24);

@@ -13,14 +13,14 @@
 
       <div class="grid gap-4 xl:grid-cols-4">
         {% for column, items in projects_data.project_board.items() %}
-        <section class="rounded-2xl border border-slate-800 bg-slate-950/70 p-3">
+        <section class="rounded-2xl border border-slate-800 bg-slate-950/70 p-3 project-drop-zone" data-column-name="{{ column }}">
           <div class="mb-3 flex items-center justify-between">
             <h3 class="font-medium">{{ column }}</h3>
-            <span class="text-xs text-slate-500">{{ items|length }}</span>
+            <span class="text-xs text-slate-500 project-column-count">{{ items|length }}</span>
           </div>
-          <div class="space-y-3">
+          <div class="space-y-3 project-column-list" data-column-name="{{ column }}">
             {% for project in items %}
-            <article class="tc3d-board-card">
+            <article class="tc3d-board-card project-card" data-project-id="{{ project.id }}" draggable="true">
               <a href="/projects/{{ project.id }}" class="block">
                 <div class="text-sm font-medium">{{ project.project_name }}</div>
                 <div class="mt-1 text-xs text-slate-500">{{ project.client }}</div>
@@ -108,6 +108,27 @@
 
 <script>
   const projectForm = document.getElementById("project-form");
+  let draggedProjectCard = null;
+
+  function updateProjectColumnCount(columnList) {
+    const countNode = columnList.closest(".project-drop-zone").querySelector(".project-column-count");
+    countNode.textContent = String(columnList.querySelectorAll(".project-card").length);
+  }
+
+  function bindProjectCardDrag(card) {
+    card.addEventListener("dragstart", () => {
+      draggedProjectCard = card;
+      card.classList.add("tc3d-dragging");
+    });
+
+    card.addEventListener("dragend", () => {
+      card.classList.remove("tc3d-dragging");
+      draggedProjectCard = null;
+      document.querySelectorAll(".project-drop-zone").forEach((zone) => {
+        zone.classList.remove("tc3d-drop-active");
+      });
+    });
+  }
 
   projectForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -133,6 +154,44 @@
         body: formData,
       });
       window.location.reload();
+    });
+  });
+
+  document.querySelectorAll(".project-card").forEach(bindProjectCardDrag);
+
+  document.querySelectorAll(".project-column-list").forEach((columnList) => {
+    columnList.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      columnList.closest(".project-drop-zone").classList.add("tc3d-drop-active");
+    });
+
+    columnList.addEventListener("dragleave", () => {
+      columnList.closest(".project-drop-zone").classList.remove("tc3d-drop-active");
+    });
+
+    columnList.addEventListener("drop", async (event) => {
+      event.preventDefault();
+      const zone = columnList.closest(".project-drop-zone");
+      zone.classList.remove("tc3d-drop-active");
+      if (!draggedProjectCard) return;
+
+      const previousList = draggedProjectCard.closest(".project-column-list");
+      columnList.appendChild(draggedProjectCard);
+      updateProjectColumnCount(previousList);
+      updateProjectColumnCount(columnList);
+
+      const status = columnList.dataset.columnName;
+      const formData = new FormData();
+      formData.append("status", status);
+      await fetch(`/api/projects/${draggedProjectCard.dataset.projectId}/status`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const select = draggedProjectCard.querySelector(".project-status-form select");
+      if (select) {
+        select.value = status;
+      }
     });
   });
 </script>

@@ -83,14 +83,14 @@
       </div>
       <div class="grid gap-4 xl:grid-cols-4">
         {% for column, items in detail.task_board.items() %}
-        <section class="rounded-2xl border border-slate-800 bg-slate-950/70 p-3">
+        <section class="rounded-2xl border border-slate-800 bg-slate-950/70 p-3 task-drop-zone" data-column-name="{{ column }}">
           <div class="mb-3 flex items-center justify-between">
             <h3 class="font-medium">{{ column }}</h3>
             <span class="text-xs text-slate-500 task-column-count">{{ items|length }}</span>
           </div>
           <div class="space-y-3 task-column-list" data-column-name="{{ column }}">
             {% for task in items %}
-            <article class="tc3d-board-card">
+            <article class="tc3d-board-card task-card" data-task-id="{{ task.id }}" draggable="true">
               <div class="text-sm font-medium">{{ task.title }}</div>
               {% if task.notes %}
               <div class="mt-2 text-xs text-slate-500">{{ task.notes }}</div>
@@ -150,6 +150,7 @@
   const checklistItems = document.getElementById("checklist-items");
   const showQuickAddButton = document.getElementById("show-quick-add");
   const quickAddList = document.getElementById("quick-add-list");
+  let draggedTaskCard = null;
 
   function bindTaskStatusSelect(select) {
     select.addEventListener("change", async () => {
@@ -211,6 +212,20 @@
     countNode.textContent = String(Number(countNode.textContent || "0") + 1);
   }
 
+  function updateTaskColumnCount(columnList) {
+    const countNode = columnList.parentElement.querySelector(".task-column-count");
+    countNode.textContent = String(columnList.querySelectorAll(".task-card").length);
+  }
+
+  function syncChecklistItem(taskId, status) {
+    const checkbox = document.querySelector(`.checklist-toggle[data-task-id="${taskId}"]`);
+    const item = checkbox?.closest(".tc3d-check-item");
+    if (!checkbox || !item) return;
+    const done = status === "Hecho";
+    checkbox.checked = done;
+    item.classList.toggle("tc3d-check-item-done", done);
+  }
+
   function buildChecklistItem(task) {
     const label = document.createElement("label");
     label.className = "tc3d-check-item";
@@ -231,6 +246,21 @@
     return label;
   }
 
+  function bindTaskCardDrag(card) {
+    card.addEventListener("dragstart", () => {
+      draggedTaskCard = card;
+      card.classList.add("tc3d-dragging");
+    });
+
+    card.addEventListener("dragend", () => {
+      card.classList.remove("tc3d-dragging");
+      draggedTaskCard = null;
+      document.querySelectorAll(".task-drop-zone").forEach((zone) => {
+        zone.classList.remove("tc3d-drop-active");
+      });
+    });
+  }
+
   async function submitQuickTask(title, input) {
     const formData = new FormData();
     formData.append("title", title);
@@ -245,7 +275,12 @@
       const data = await response.json();
       const list = document.querySelector(`.task-column-list[data-column-name="${data.task.status}"]`);
       if (list) {
-        list.appendChild(buildTaskCard(data.task));
+        const card = buildTaskCard(data.task);
+        card.classList.add("task-card");
+        card.dataset.taskId = data.task.id;
+        card.setAttribute("draggable", "true");
+        bindTaskCardDrag(card);
+        list.appendChild(card);
         incrementColumnCount(data.task.status);
       }
       checklistItems.appendChild(buildChecklistItem(data.task));
@@ -265,6 +300,10 @@
 
       const item = checkbox.closest(".tc3d-check-item");
       item.classList.toggle("tc3d-check-item-done", checkbox.checked);
+      const select = document.querySelector(`.project-task-status-form[data-task-id="${checkbox.dataset.taskId}"] select`);
+      if (select) {
+        select.value = checkbox.checked ? "Hecho" : "Por hacer";
+      }
     });
   }
 
@@ -319,5 +358,43 @@
 
   document.querySelectorAll(".project-task-status-form select").forEach(bindTaskStatusSelect);
   document.querySelectorAll(".checklist-toggle").forEach(bindChecklistToggle);
+  document.querySelectorAll(".task-card").forEach(bindTaskCardDrag);
+
+  document.querySelectorAll(".task-column-list").forEach((columnList) => {
+    columnList.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      columnList.closest(".task-drop-zone").classList.add("tc3d-drop-active");
+    });
+
+    columnList.addEventListener("dragleave", () => {
+      columnList.closest(".task-drop-zone").classList.remove("tc3d-drop-active");
+    });
+
+    columnList.addEventListener("drop", async (event) => {
+      event.preventDefault();
+      const zone = columnList.closest(".task-drop-zone");
+      zone.classList.remove("tc3d-drop-active");
+      if (!draggedTaskCard) return;
+
+      const previousList = draggedTaskCard.closest(".task-column-list");
+      columnList.appendChild(draggedTaskCard);
+      updateTaskColumnCount(previousList);
+      updateTaskColumnCount(columnList);
+
+      const status = columnList.dataset.columnName;
+      const formData = new FormData();
+      formData.append("status", status);
+      await fetch(`/api/project-tasks/${draggedTaskCard.dataset.taskId}/status`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const select = draggedTaskCard.querySelector(".project-task-status-form select");
+      if (select) {
+        select.value = status;
+      }
+      syncChecklistItem(draggedTaskCard.dataset.taskId, status);
+    });
+  });
 </script>
 {% endblock %}
