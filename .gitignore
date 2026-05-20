@@ -4,4 +4,5 @@ __pycache__/
 data/*.db
 uvicorn.out.log
 uvicorn.err.log
-
+tmp-uvicorn.out.log
+tmp-uvicorn.err.log
