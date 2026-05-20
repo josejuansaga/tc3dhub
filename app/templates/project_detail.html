@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block content %}
+<main class="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
+  <aside class="space-y-6">
+    <article class="tc3d-panel">
+      <div class="mb-4">
+        <p class="tc3d-label">Ficha proyecto</p>
+        <h2 class="text-xl font-semibold">{{ detail.project.project_name }}</h2>
+        <p class="mt-2 text-sm text-slate-400">{{ detail.project.client }}</p>
+      </div>
+
+      <form action="/api/projects/{{ detail.project.id }}" method="post" class="space-y-3">
+        <input class="tc3d-input" type="text" name="client" value="{{ detail.project.client }}" required />
+        <input class="tc3d-input" type="text" name="project_name" value="{{ detail.project.project_name }}" required />
+        <select class="tc3d-input" name="status" required>
+          {% for status_name in ['Pendiente inicio', 'En produccion', 'Revision cliente', 'Completado'] %}
+          <option value="{{ status_name }}" {% if detail.project.status == status_name %}selected{% endif %}>{{ status_name }}</option>
+          {% endfor %}
+        </select>
+        <input class="tc3d-input" type="date" name="delivery_date" value="{{ detail.project.delivery_date }}" required />
+        <input class="tc3d-input" type="number" step="0.01" name="amount" value="{{ detail.project.amount }}" required />
+        <input class="tc3d-input" type="text" name="folder_path" value="{{ detail.project.folder_path }}" placeholder="Ruta o enlace carpeta" />
+        <textarea class="tc3d-input min-h-24" name="description" placeholder="Descripcion">{{ detail.project.description }}</textarea>
+        <textarea class="tc3d-input min-h-24" name="notes" placeholder="Notas">{{ detail.project.notes }}</textarea>
+        <button class="tc3d-button w-full" type="submit">Guardar cambios</button>
+      </form>
+
+      {% if detail.project.folder_path %}
+      <a href="{{ detail.project.folder_path }}" target="_blank" class="tc3d-button tc3d-button-secondary mt-3 block text-center">Abrir carpeta de trabajo</a>
+      {% endif %}
+    </article>
+
+    <article class="tc3d-panel">
+      <div class="mb-4">
+        <p class="tc3d-label">Nueva tarjeta</p>
+        <h2 class="text-xl font-semibold">Anadir tarea</h2>
+      </div>
+      <form id="project-task-form" class="space-y-3">
+        <input class="tc3d-input" type="text" name="title" placeholder="Titulo de la tarea" required />
+        <select class="tc3d-input" name="status" required>
+          {% for status_name in detail.task_columns %}
+          <option value="{{ status_name }}">{{ status_name }}</option>
+          {% endfor %}
+        </select>
+        <textarea class="tc3d-input min-h-24" name="notes" placeholder="Notas de la tarea"></textarea>
+        <button class="tc3d-button w-full" type="submit">Crear tarjeta</button>
+      </form>
+    </article>
+  </aside>
+
+  <section class="space-y-6">
+    <article class="tc3d-panel">
+      <div class="mb-4 flex items-center justify-between gap-4">
+        <div>
+          <p class="tc3d-label">Trabajo del proyecto</p>
+          <h2 class="text-xl font-semibold">Tablero interno</h2>
+        </div>
+        <a href="/projects" class="tc3d-nav">Volver a proyectos</a>
+      </div>
+      <div class="grid gap-4 xl:grid-cols-4">
+        {% for column, items in detail.task_board.items() %}
+        <section class="rounded-2xl border border-slate-800 bg-slate-950/70 p-3">
+          <div class="mb-3 flex items-center justify-between">
+            <h3 class="font-medium">{{ column }}</h3>
+            <span class="text-xs text-slate-500">{{ items|length }}</span>
+          </div>
+          <div class="space-y-3">
+            {% for task in items %}
+            <article class="tc3d-board-card">
+              <div class="text-sm font-medium">{{ task.title }}</div>
+              {% if task.notes %}
+              <div class="mt-2 text-xs text-slate-500">{{ task.notes }}</div>
+              {% endif %}
+              <form class="project-task-status-form mt-3" data-task-id="{{ task.id }}">
+                <select name="status" class="tc3d-input text-sm">
+                  {% for status_name in detail.task_columns %}
+                  <option value="{{ status_name }}" {% if task.status == status_name %}selected{% endif %}>{{ status_name }}</option>
+                  {% endfor %}
+                </select>
+              </form>
+            </article>
+            {% endfor %}
+          </div>
+        </section>
+        {% endfor %}
+      </div>
+    </article>
+
+    <article class="tc3d-panel">
+      <div class="mb-4">
+        <p class="tc3d-label">Resumen</p>
+        <h2 class="text-xl font-semibold">Informacion del proyecto</h2>
+      </div>
+      <div class="grid gap-4 md:grid-cols-2">
+        <div class="tc3d-card">
+          <p class="tc3d-label">Cliente</p>
+          <p class="mt-2 text-sm text-slate-300">{{ detail.project.client }}</p>
+        </div>
+        <div class="tc3d-card">
+          <p class="tc3d-label">Entrega</p>
+          <p class="mt-2 text-sm text-slate-300">{{ detail.project.delivery_date }}</p>
+        </div>
+        <div class="tc3d-card">
+          <p class="tc3d-label">Estado</p>
+          <p class="mt-2 text-sm text-slate-300">{{ detail.project.status }}</p>
+        </div>
+        <div class="tc3d-card">
+          <p class="tc3d-label">Importe</p>
+          <p class="mt-2 text-sm text-slate-300">{{ detail.project.amount }} €</p>
+        </div>
+      </div>
+      {% if detail.project.description %}
+      <div class="mt-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-300">
+        {{ detail.project.description }}
+      </div>
+      {% endif %}
+    </article>
+  </section>
+</main>
+
+<script>
+  const projectTaskForm = document.getElementById("project-task-form");
+
+  projectTaskForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const formData = new FormData(projectTaskForm);
+    const response = await fetch("/api/projects/{{ detail.project.id }}/tasks", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (response.ok) {
+      window.location.reload();
+    }
+  });
+
+  document.querySelectorAll(".project-task-status-form select").forEach((select) => {
+    select.addEventListener("change", async () => {
+      const form = select.closest(".project-task-status-form");
+      const formData = new FormData();
+      formData.append("status", select.value);
+      await fetch(`/api/project-tasks/${form.dataset.taskId}/status`, {
+        method: "POST",
+        body: formData,
+      });
+      window.location.reload();
+    });
+  });
+</script>
+{% endblock %}

@@ -1,8 +1,8 @@
 import os
 
 from anthropic import Anthropic
-from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -12,6 +12,19 @@ from database import ensure_database, get_connection
 app = FastAPI(title=os.getenv("APP_NAME", "TC3D Hub"))
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+PROJECT_COLUMNS = [
+    "Pendiente inicio",
+    "En produccion",
+    "Revision cliente",
+    "Completado",
+]
+TASK_COLUMNS = [
+    "Por hacer",
+    "En marcha",
+    "Bloqueado",
+    "Hecho",
+]
 
 
 def fetch_dashboard_data() -> dict:
@@ -23,48 +36,31 @@ def fetch_dashboard_data() -> dict:
             "SELECT * FROM production_metrics WHERE id = 1"
         ).fetchone()
         projects = connection.execute(
-            """
-            SELECT * FROM projects
-            ORDER BY delivery_date ASC
-            """
+            "SELECT * FROM projects ORDER BY delivery_date ASC"
         ).fetchall()
         links = connection.execute(
             "SELECT * FROM quick_links ORDER BY id ASC"
         ).fetchall()
         meetings = connection.execute(
-            """
-            SELECT * FROM meetings
-            ORDER BY meeting_date ASC
-            """
+            "SELECT * FROM meetings ORDER BY meeting_date ASC"
         ).fetchall()
         tasks = connection.execute(
-            """
-            SELECT * FROM meeting_tasks
-            ORDER BY id ASC
-            """
+            "SELECT * FROM meeting_tasks ORDER BY id ASC"
         ).fetchall()
 
     active_projects = sum(
         1 for project in projects if project["status"] != "Completado"
     )
-    board_columns = [
-        "Pendiente inicio",
-        "En produccion",
-        "Revision cliente",
-        "Completado",
-    ]
-    project_board = {
-        column: [dict(project) for project in projects if project["status"] == column]
-        for column in board_columns
-    }
     next_deliverables = [
         {
             "project_name": project["project_name"],
             "client": project["client"],
             "delivery_date": project["delivery_date"],
         }
-        for project in projects[:3]
+        for project in projects[:4]
     ]
+    recent_projects = [dict(project) for project in projects[:5]]
+
     tasks_by_meeting = {}
     for task in tasks:
         tasks_by_meeting.setdefault(task["meeting_id"], []).append(dict(task))
@@ -78,12 +74,61 @@ def fetch_dashboard_data() -> dict:
     return {
         "company": dict(company) if company else {},
         "production": dict(production) if production else {},
-        "projects": [dict(project) for project in projects],
-        "project_board": project_board,
         "links": [dict(link) for link in links],
         "meetings": meetings_with_tasks,
         "active_projects": active_projects,
         "next_deliverables": next_deliverables,
+        "recent_projects": recent_projects,
+    }
+
+
+def fetch_projects_data() -> dict:
+    with get_connection() as connection:
+        projects = connection.execute(
+            "SELECT * FROM projects ORDER BY delivery_date ASC, id DESC"
+        ).fetchall()
+
+    project_list = [dict(project) for project in projects]
+    project_board = {
+        column: [project for project in project_list if project["status"] == column]
+        for column in PROJECT_COLUMNS
+    }
+
+    return {
+        "projects": project_list,
+        "project_board": project_board,
+        "project_columns": PROJECT_COLUMNS,
+    }
+
+
+def fetch_project_detail(project_id: int) -> dict:
+    with get_connection() as connection:
+        project = connection.execute(
+            "SELECT * FROM projects WHERE id = ?",
+            (project_id,),
+        ).fetchone()
+        if not project:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+        tasks = connection.execute(
+            """
+            SELECT * FROM project_tasks
+            WHERE project_id = ?
+            ORDER BY id ASC
+            """,
+            (project_id,),
+        ).fetchall()
+
+    task_list = [dict(task) for task in tasks]
+    task_board = {
+        column: [task for task in task_list if task["status"] == column]
+        for column in TASK_COLUMNS
+    }
+
+    return {
+        "project": dict(project),
+        "task_board": task_board,
+        "task_columns": TASK_COLUMNS,
     }
 
 
@@ -102,6 +147,32 @@ def index(request: Request):
     )
 
 
+@app.get("/projects", response_class=HTMLResponse)
+def projects_page(request: Request):
+    project_data = fetch_projects_data()
+    return templates.TemplateResponse(
+        request=request,
+        name="projects.html",
+        context={
+            "projects_data": project_data,
+            "app_name": os.getenv("APP_NAME", "TC3D Hub"),
+        },
+    )
+
+
+@app.get("/projects/{project_id}", response_class=HTMLResponse)
+def project_detail_page(request: Request, project_id: int):
+    detail = fetch_project_detail(project_id)
+    return templates.TemplateResponse(
+        request=request,
+        name="project_detail.html",
+        context={
+            "detail": detail,
+            "app_name": os.getenv("APP_NAME", "TC3D Hub"),
+        },
+    )
+
+
 @app.get("/api/dashboard")
 def get_dashboard():
     return fetch_dashboard_data()
@@ -115,18 +186,31 @@ def create_project(
     delivery_date: str = Form(...),
     amount: float = Form(...),
     notes: str = Form(""),
+    description: str = Form(""),
+    folder_path: str = Form(""),
 ):
     with get_connection() as connection:
-        connection.execute(
+        cursor = connection.cursor()
+        cursor.execute(
             """
             INSERT INTO projects (
-                client, project_name, status, delivery_date, amount, notes
-            ) VALUES (?, ?, ?, ?, ?, ?)
+                client, project_name, status, delivery_date, amount, notes, description, folder_path
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (client, project_name, status, delivery_date, amount, notes),
+            (
+                client,
+                project_name,
+                status,
+                delivery_date,
+                amount,
+                notes,
+                description,
+                folder_path,
+            ),
         )
+        project_id = cursor.lastrowid
         connection.commit()
-    return JSONResponse({"ok": True})
+    return JSONResponse({"ok": True, "project_id": project_id})
 
 
 @app.post("/api/projects/{project_id}/status")
@@ -135,6 +219,72 @@ def update_project_status(project_id: int, status: str = Form(...)):
         connection.execute(
             "UPDATE projects SET status = ? WHERE id = ?",
             (status, project_id),
+        )
+        connection.commit()
+    return JSONResponse({"ok": True})
+
+
+@app.post("/api/projects/{project_id}")
+def update_project(
+    project_id: int,
+    client: str = Form(...),
+    project_name: str = Form(...),
+    status: str = Form(...),
+    delivery_date: str = Form(...),
+    amount: float = Form(...),
+    notes: str = Form(""),
+    description: str = Form(""),
+    folder_path: str = Form(""),
+):
+    with get_connection() as connection:
+        connection.execute(
+            """
+            UPDATE projects
+            SET client = ?, project_name = ?, status = ?, delivery_date = ?,
+                amount = ?, notes = ?, description = ?, folder_path = ?
+            WHERE id = ?
+            """,
+            (
+                client,
+                project_name,
+                status,
+                delivery_date,
+                amount,
+                notes,
+                description,
+                folder_path,
+                project_id,
+            ),
+        )
+        connection.commit()
+    return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+
+
+@app.post("/api/projects/{project_id}/tasks")
+def create_project_task(
+    project_id: int,
+    title: str = Form(...),
+    status: str = Form(...),
+    notes: str = Form(""),
+):
+    with get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO project_tasks (project_id, title, status, notes)
+            VALUES (?, ?, ?, ?)
+            """,
+            (project_id, title, status, notes),
+        )
+        connection.commit()
+    return JSONResponse({"ok": True})
+
+
+@app.post("/api/project-tasks/{task_id}/status")
+def update_project_task_status(task_id: int, status: str = Form(...)):
+    with get_connection() as connection:
+        connection.execute(
+            "UPDATE project_tasks SET status = ? WHERE id = ?",
+            (status, task_id),
         )
         connection.commit()
     return JSONResponse({"ok": True})
@@ -192,7 +342,7 @@ def generate_ai(prompt: str = Form(...), mode: str = Form(...)):
         return {
             "result": (
                 "Anthropic no esta configurado aun. "
-                "Añade ANTHROPIC_API_KEY en tu archivo .env para activar este modulo."
+                "Anade ANTHROPIC_API_KEY en tu archivo .env para activar este modulo."
             )
         }
 
@@ -200,7 +350,7 @@ def generate_ai(prompt: str = Form(...), mode: str = Form(...)):
     model = os.getenv("ANTHROPIC_MODEL", "claude-3-5-haiku-latest")
 
     system_prompt = (
-        "Eres un asistente operativo para un estudio pequeño de visualizacion 3D. "
+        "Eres un asistente operativo para un estudio pequeno de visualizacion 3D. "
         "Responde de forma clara, breve y util."
     )
 

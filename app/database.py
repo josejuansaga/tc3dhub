@@ -60,10 +60,30 @@ def ensure_database() -> None:
                 is_done INTEGER NOT NULL DEFAULT 0,
                 FOREIGN KEY (meeting_id) REFERENCES meetings (id) ON DELETE CASCADE
             );
+
+            CREATE TABLE IF NOT EXISTS project_tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                status TEXT NOT NULL,
+                notes TEXT DEFAULT '',
+                FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
+            );
             """
         )
+        ensure_project_columns(cursor)
         connection.commit()
         seed_data(connection)
+
+
+def ensure_project_columns(cursor: sqlite3.Cursor) -> None:
+    columns = {
+        row[1] for row in cursor.execute("PRAGMA table_info(projects)").fetchall()
+    }
+    if "description" not in columns:
+        cursor.execute("ALTER TABLE projects ADD COLUMN description TEXT DEFAULT ''")
+    if "folder_path" not in columns:
+        cursor.execute("ALTER TABLE projects ADD COLUMN folder_path TEXT DEFAULT ''")
 
 
 def seed_data(connection: sqlite3.Connection) -> None:
@@ -73,8 +93,8 @@ def seed_data(connection: sqlite3.Connection) -> None:
         cursor.executemany(
             """
             INSERT INTO projects (
-                client, project_name, status, delivery_date, amount, notes
-            ) VALUES (?, ?, ?, ?, ?, ?)
+                client, project_name, status, delivery_date, amount, notes, description, folder_path
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -84,6 +104,8 @@ def seed_data(connection: sqlite3.Connection) -> None:
                     "2026-05-24",
                     1450,
                     "Faltan 2 renders exteriores",
+                    "Proyecto de visualizacion interior y exterior para vivienda piloto.",
+                    "file:///D:/Proyectos3D/Rivera/Vivienda-piloto",
                 ),
                 (
                     "Estudio Armonia",
@@ -92,6 +114,8 @@ def seed_data(connection: sqlite3.Connection) -> None:
                     "2026-05-22",
                     680,
                     "Esperando feedback final",
+                    "Imagenes de cocina premium para aprobacion comercial.",
+                    "file:///D:/Proyectos3D/Armonia/Cocina-premium",
                 ),
                 (
                     "Habita Norte",
@@ -100,6 +124,8 @@ def seed_data(connection: sqlite3.Connection) -> None:
                     "2026-05-29",
                     2100,
                     "Presupuesto aprobado esta semana",
+                    "Recorrido para promocion de adosados con enfoque comercial.",
+                    "file:///D:/Proyectos3D/HabitaNorte/Tour-adosados",
                 ),
             ],
         )
@@ -158,6 +184,45 @@ def seed_data(connection: sqlite3.Connection) -> None:
                 (meeting_id, "Anotar cambios pedidos por cliente", 0),
                 (meeting_id, "Enviar resumen y tareas al terminar", 0),
             ],
+        )
+
+    if cursor.execute("SELECT COUNT(*) FROM project_tasks").fetchone()[0] == 0:
+        project_rows = cursor.execute(
+            "SELECT id, project_name FROM projects ORDER BY id ASC"
+        ).fetchall()
+        project_map = {row[1]: row[0] for row in project_rows}
+        task_rows = [
+            (
+                project_map.get("Infografias vivienda piloto"),
+                "Definir encuadres finales",
+                "Por hacer",
+                "Esperando validacion del cliente.",
+            ),
+            (
+                project_map.get("Infografias vivienda piloto"),
+                "Render exterior principal",
+                "En marcha",
+                "Prioridad alta.",
+            ),
+            (
+                project_map.get("Render cocina premium"),
+                "Corregir materiales encimera",
+                "Bloqueado",
+                "A falta de referencia nueva.",
+            ),
+            (
+                project_map.get("Tour 3D adosados"),
+                "Preparar estructura del tour",
+                "Por hacer",
+                "",
+            ),
+        ]
+        cursor.executemany(
+            """
+            INSERT INTO project_tasks (project_id, title, status, notes)
+            VALUES (?, ?, ?, ?)
+            """,
+            [row for row in task_rows if row[0] is not None],
         )
 
     connection.commit()

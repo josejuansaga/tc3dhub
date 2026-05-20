@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ app_name }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/app.css" />
+  </head>
+  <body class="min-h-screen bg-slate-950 text-slate-100">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <header class="mb-6 border-b border-slate-800 pb-6">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p class="mb-2 text-xs uppercase tracking-[0.35em] text-cyan-400">Tu Casa en 3D</p>
+            <h1 class="text-3xl font-semibold tracking-tight">{{ app_name }}</h1>
+            <p class="mt-2 max-w-2xl text-sm text-slate-400">
+              Panel operativo simple, visual y modular para gestionar proyectos 3D.
+            </p>
+          </div>
+          <nav class="flex flex-wrap gap-2">
+            <a href="/" class="tc3d-nav {% if request.url.path == '/' %}tc3d-nav-active{% endif %}">Inicio</a>
+            <a href="/projects" class="tc3d-nav {% if request.url.path.startswith('/projects') %}tc3d-nav-active{% endif %}">Proyectos</a>
+          </nav>
+        </div>
+      </header>
+
+      {% block content %}{% endblock %}
+    </div>
+  </body>
+</html>
+

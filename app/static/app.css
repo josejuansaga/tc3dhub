@@ -53,9 +53,43 @@ body {
   cursor: pointer;
 }
 
+.tc3d-button-small {
+  padding: 0.7rem 0.95rem;
+  font-size: 0.95rem;
+}
+
+.tc3d-button-secondary {
+  background: rgba(8, 47, 73, 0.6);
+  border: 1px solid rgba(34, 211, 238, 0.18);
+}
+
 .tc3d-button:hover,
 .tc3d-link:hover {
   filter: brightness(1.08);
+}
+
+.tc3d-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(51, 65, 85, 1);
+  background: rgba(15, 23, 42, 0.65);
+  padding: 0.75rem 1rem;
+  color: rgb(203 213 225);
+  text-decoration: none;
+  transition: 160ms ease;
+}
+
+.tc3d-nav:hover {
+  border-color: rgba(34, 211, 238, 0.35);
+  color: white;
+}
+
+.tc3d-nav-active {
+  border-color: rgba(34, 211, 238, 0.35);
+  background: rgba(8, 47, 73, 0.72);
+  color: white;
 }
 
 .tc3d-link {
@@ -67,4 +101,30 @@ body {
   color: rgb(224 242 254);
   text-decoration: none;
   transition: 160ms ease;
+}
+
+.tc3d-link-card,
+.tc3d-board-card {
+  display: block;
+  border-radius: 1rem;
+  border: 1px solid rgba(30, 41, 59, 0.9);
+  background: rgba(2, 6, 23, 0.8);
+  padding: 1rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.tc3d-link-card:hover,
+.tc3d-board-card:hover {
+  border-color: rgba(34, 211, 238, 0.24);
+}
+
+.tc3d-chip {
+  border-radius: 999px;
+  border: 1px solid rgba(34, 211, 238, 0.24);
+  background: rgba(8, 47, 73, 0.45);
+  padding: 0.35rem 0.7rem;
+  font-size: 0.72rem;
+  color: rgb(165 243 252);
+  white-space: nowrap;
 }
