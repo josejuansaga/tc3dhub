@@ -20,6 +20,7 @@ Objetivo real:
 - datos simples
 - Docker desde el inicio
 - compatible con Windows, NAS Synology y acceso web
+- pensado tambien para iPad como panel de control
 - bajo coste y mantenimiento facil
 
 ## Stack elegido
@@ -53,6 +54,25 @@ Una sola app:
 - `frontend`: dashboard y formularios
 - `backend`: API y logica simple
 - `sqlite`: base local en archivo
+
+### Enfoque iPad recomendado
+
+No hacer app nativa al principio.
+
+Lo recomendado es:
+
+- version web responsive
+- modo `PWA`
+- icono en pantalla de inicio del iPad
+- interfaz pensada para tocar con dedo
+- bloques grandes y pocas acciones por pantalla
+
+Ventajas:
+
+- un solo desarrollo
+- sirve en Windows, NAS, web e iPad
+- mantenimiento mucho mas facil
+- coste casi cero
 
 ### Fase de crecimiento
 
@@ -128,6 +148,8 @@ Evolucion recomendada:
 - fecha entrega cliente
 - etiquetas
 - arrastrar entre columnas
+- vista compacta para iPad
+- vista diaria para reuniones y checklist
 
 ### 3. Produccion
 
@@ -162,6 +184,12 @@ Ejemplos:
 - WhatsApp
 - presupuestos
 - fichas cliente
+
+Nota para iPad:
+
+- en iPad algunos accesos seran enlaces web
+- las carpetas locales de Windows no abriran igual
+- conviene exponer accesos clave via web o Synology Drive
 
 ### 5. IA
 
@@ -217,6 +245,8 @@ Tareas:
 - mejorar tarjeta de proyecto
 - permitir editar proyectos
 - permitir editar reuniones y tareas
+- optimizar uso tactil para iPad
+- crear vista "hoy"
 
 ### Fase 3 - Integraciones utiles
 
@@ -265,6 +295,24 @@ Tareas:
 - HTTPS
 - acceso por VPN o Tailscale si prefieres menos exposicion
 
+### Fase 6 - Modo iPad
+
+Prioridad: media-alta
+
+Objetivo:
+
+- usar TC3D Hub como panel central desde iPad
+
+Tareas:
+
+- hacer layout mas tactil
+- añadir `manifest.json`
+- añadir iconos app
+- activar modo PWA instalable
+- simplificar barra superior
+- crear vista rapida para reuniones, tareas y agenda
+- probar Safari iPad
+
 ## Orden exacto de desarrollo recomendado
 
 1. fijar flujo real de trabajo
@@ -291,12 +339,14 @@ Tareas:
 - editar reuniones
 - filtros por estado
 - generacion de tareas desde IA
+- primera optimizacion para iPad
 
 ### Sprint 3
 
 - webhook de `n8n`
 - entrada automatica de leads, reuniones o tareas
 - backup automatizado en NAS
+- modo PWA instalable
 
 ## Modelo de datos recomendado a corto plazo
 
@@ -404,4 +454,37 @@ Dejar el sistema en este orden:
 3. acceso NAS confirmado
 4. despliegue en NAS
 5. estados reales de trabajo adaptados
+6. experiencia iPad definida
 
+## Experiencia recomendada en iPad
+
+### Pantallas clave
+
+1. Hoy
+
+- reuniones del dia
+- tareas pendientes
+- proximos entregables
+
+2. Trabajo
+
+- tablero de proyectos
+- checklist rapido
+
+3. Produccion
+
+- renders pendientes
+- cola render
+
+4. IA
+
+- resumir reunion
+- convertir notas en tareas
+
+### Recomendaciones de diseño
+
+- botones grandes
+- menos texto por bloque
+- una accion principal por tarjeta
+- formularios cortos
+- navegacion inferior o lateral muy simple
