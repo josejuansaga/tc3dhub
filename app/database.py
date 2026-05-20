@@ -1,16 +1,21 @@
 import os
+import shutil
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "data"))
+DATA_DIR = os.getenv(
+    "DATA_DIR",
+    os.path.normpath(os.path.join(BASE_DIR, "..", "data")),
+)
 DB_PATH = os.path.join(DATA_DIR, "tc3d_hub.db")
+LEGACY_DB_PATH = "/data/tc3d_hub.db"
 
 
 def ensure_database() -> None:
     os.makedirs(DATA_DIR, exist_ok=True)
+    migrate_legacy_database()
     with sqlite3.connect(DB_PATH) as connection:
         cursor = connection.cursor()
         cursor.executescript(
@@ -88,6 +93,15 @@ def ensure_database() -> None:
         ensure_client_links(cursor)
         connection.commit()
         seed_data(connection)
+
+
+def migrate_legacy_database() -> None:
+    if DB_PATH == LEGACY_DB_PATH:
+        return
+    if os.path.exists(DB_PATH):
+        return
+    if os.path.exists(LEGACY_DB_PATH):
+        shutil.copy2(LEGACY_DB_PATH, DB_PATH)
 
 
 def ensure_project_columns(cursor: sqlite3.Cursor) -> None:
