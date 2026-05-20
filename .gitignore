@@ -1,0 +1,7 @@
+.env
+__pycache__/
+*.pyc
+data/*.db
+uvicorn.out.log
+uvicorn.err.log
+
