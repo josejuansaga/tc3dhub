@@ -2,20 +2,31 @@ import os
 import shutil
 import sqlite3
 from contextlib import contextmanager
+from datetime import datetime
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.getenv(
+DATA_ROOT = os.getenv(
     "DATA_DIR",
     os.path.normpath(os.path.join(BASE_DIR, "..", "data")),
 )
-DB_PATH = os.path.join(DATA_DIR, "tc3d_hub.db")
-LEGACY_DB_PATH = "/data/tc3d_hub.db"
+DB_DIR = os.path.join(DATA_ROOT, "db")
+BACKUP_DIR = os.path.join(DATA_ROOT, "backups")
+EXPORTS_DIR = os.path.join(DATA_ROOT, "exports")
+PROJECT_EXPORTS_DIR = os.path.join(EXPORTS_DIR, "projects")
+CLIENT_EXPORTS_DIR = os.path.join(EXPORTS_DIR, "clients")
+TRELLO_EXPORTS_DIR = os.path.join(EXPORTS_DIR, "trello")
+DB_PATH = os.path.join(DB_DIR, "tc3d_hub.db")
+LEGACY_DB_PATHS = [
+    "/data/tc3d_hub.db",
+    os.path.join(DATA_ROOT, "tc3d_hub.db"),
+]
 
 
 def ensure_database() -> None:
-    os.makedirs(DATA_DIR, exist_ok=True)
+    ensure_data_structure()
     migrate_legacy_database()
+    create_backup_snapshot()
     with sqlite3.connect(DB_PATH) as connection:
         cursor = connection.cursor()
         cursor.executescript(
@@ -95,13 +106,52 @@ def ensure_database() -> None:
         seed_data(connection)
 
 
+def ensure_data_structure() -> None:
+    for path in [
+        DATA_ROOT,
+        DB_DIR,
+        BACKUP_DIR,
+        EXPORTS_DIR,
+        PROJECT_EXPORTS_DIR,
+        CLIENT_EXPORTS_DIR,
+        TRELLO_EXPORTS_DIR,
+    ]:
+        os.makedirs(path, exist_ok=True)
+
+
 def migrate_legacy_database() -> None:
-    if DB_PATH == LEGACY_DB_PATH:
-        return
     if os.path.exists(DB_PATH):
         return
-    if os.path.exists(LEGACY_DB_PATH):
-        shutil.copy2(LEGACY_DB_PATH, DB_PATH)
+    for legacy_path in LEGACY_DB_PATHS:
+        if legacy_path == DB_PATH:
+            continue
+        if os.path.exists(legacy_path):
+            shutil.copy2(legacy_path, DB_PATH)
+            break
+
+
+def create_backup_snapshot() -> None:
+    if not os.path.exists(DB_PATH):
+        return
+
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    backup_path = os.path.join(BACKUP_DIR, f"tc3d_hub-{timestamp}.db")
+    shutil.copy2(DB_PATH, backup_path)
+    prune_old_backups(max_backups=20)
+
+
+def prune_old_backups(max_backups: int) -> None:
+    backups = sorted(
+        [
+            os.path.join(BACKUP_DIR, name)
+            for name in os.listdir(BACKUP_DIR)
+            if name.endswith(".db")
+        ],
+        key=os.path.getmtime,
+        reverse=True,
+    )
+    for old_backup in backups[max_backups:]:
+        os.remove(old_backup)
 
 
 def ensure_project_columns(cursor: sqlite3.Cursor) -> None:

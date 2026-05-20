@@ -34,6 +34,9 @@ TC3D Hub/
 │  └─ static/
 │     └─ app.css
 ├─ data/
+│  ├─ db/
+│  ├─ backups/
+│  └─ exports/
 ├─ .env.example
 ├─ docker-compose.yml
 └─ README.md
@@ -144,6 +147,22 @@ Empieza con esto:
 
 Como `SQLite` es un solo archivo, el backup es muy facil.
 
+## Persistencia de datos
+
+Los datos reales NO viven dentro del codigo de la app.
+
+Viven en:
+
+- `data/db/tc3d_hub.db`
+- `data/backups/`
+- `data/exports/`
+
+Esto permite:
+
+- actualizar codigo sin perder informacion
+- mover la app de maquina o NAS sin romper los datos
+- hacer backup de una sola carpeta
+
 ## Siguiente paso recomendado
 
 Levanta el MVP, prueba la interfaz y luego cambiamos juntos:
@@ -152,4 +171,3 @@ Levanta el MVP, prueba la interfaz y luego cambiamos juntos:
 - estados reales
 - accesos rapidos reales
 - automatizaciones con n8n
-
