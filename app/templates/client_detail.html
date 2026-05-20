@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block content %}
+<main class="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
+  <aside>
+    <article class="tc3d-panel">
+      <div class="mb-4">
+        <p class="tc3d-label">Cliente</p>
+        <h2 class="text-xl font-semibold">{{ detail.client.name }}</h2>
+        <p class="mt-2 text-sm text-slate-400">Creado: {{ detail.client.created_at }}</p>
+      </div>
+      <form action="/api/clients/{{ detail.client.id }}" method="post" class="space-y-3">
+        <input class="tc3d-input" type="text" name="name" value="{{ detail.client.name }}" required />
+        <input class="tc3d-input" type="text" name="contact_person" value="{{ detail.client.contact_person }}" placeholder="Persona de contacto" />
+        <input class="tc3d-input" type="email" name="email" value="{{ detail.client.email }}" placeholder="Email" />
+        <input class="tc3d-input" type="text" name="phone" value="{{ detail.client.phone }}" placeholder="Telefono" />
+        <input class="tc3d-input" type="text" name="city" value="{{ detail.client.city }}" placeholder="Ciudad" />
+        <input class="tc3d-input" type="url" name="gallery_url" value="{{ detail.client.gallery_url }}" placeholder="URL galeria online" />
+        <textarea class="tc3d-input min-h-24" name="notes" placeholder="Notas del cliente">{{ detail.client.notes }}</textarea>
+        <button class="tc3d-button w-full" type="submit">Guardar cliente</button>
+      </form>
+      {% if detail.client.gallery_url %}
+      <a href="{{ detail.client.gallery_url }}" target="_blank" class="tc3d-button tc3d-button-secondary mt-3 block text-center">Abrir galeria online</a>
+      {% endif %}
+    </article>
+  </aside>
+
+  <section class="space-y-6">
+    <article class="tc3d-panel">
+      <div class="mb-4 flex items-center justify-between gap-4">
+        <div>
+          <p class="tc3d-label">Proyectos vinculados</p>
+          <h2 class="text-xl font-semibold">{{ detail.projects|length }} proyectos</h2>
+        </div>
+        <a href="/projects" class="tc3d-nav">Ir a proyectos</a>
+      </div>
+      <div class="grid gap-3 md:grid-cols-2">
+        {% for project in detail.projects %}
+        <a href="/projects/{{ project.id }}" class="tc3d-link-card">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <div class="font-medium">{{ project.project_name }}</div>
+              <div class="mt-1 text-xs text-slate-500">{{ project.status }}</div>
+            </div>
+            <span class="tc3d-chip">{{ project.amount }} €</span>
+          </div>
+          <div class="mt-3 text-xs text-slate-400">Entrega: {{ project.due_date or "Sin fecha" }}</div>
+        </a>
+        {% endfor %}
+        {% if not detail.projects %}
+        <div class="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-500">
+          Este cliente aun no tiene proyectos vinculados.
+        </div>
+        {% endif %}
+      </div>
+    </article>
+  </section>
+</main>
+{% endblock %}

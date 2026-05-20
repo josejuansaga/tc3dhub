@@ -21,6 +21,7 @@
           <nav class="flex flex-wrap gap-2">
             <a href="/" class="tc3d-nav {% if request.url.path == '/' %}tc3d-nav-active{% endif %}">Inicio</a>
             <a href="/projects" class="tc3d-nav {% if request.url.path.startswith('/projects') %}tc3d-nav-active{% endif %}">Proyectos</a>
+            <a href="/clients" class="tc3d-nav {% if request.url.path.startswith('/clients') %}tc3d-nav-active{% endif %}">Clientes</a>
           </nav>
         </div>
       </header>
@@ -29,4 +30,3 @@
     </div>
   </body>
 </html>
-

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block content %}
+<main class="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+  <section class="space-y-6">
+    <article class="tc3d-panel">
+      <div class="mb-4">
+        <p class="tc3d-label">Clientes</p>
+        <h2 class="text-xl font-semibold">Base de clientes</h2>
+      </div>
+      <div class="grid gap-3 md:grid-cols-2">
+        {% for client in clients_data.clients %}
+        <a href="/clients/{{ client.id }}" class="tc3d-link-card">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <div class="font-medium">{{ client.name }}</div>
+              <div class="mt-1 text-xs text-slate-500">{{ client.contact_person or "Sin contacto principal" }}</div>
+            </div>
+            <span class="tc3d-chip">{{ client.project_count }} proyectos</span>
+          </div>
+          {% if client.city %}
+          <div class="mt-3 text-xs text-slate-400">{{ client.city }}</div>
+          {% endif %}
+          {% if client.gallery_url %}
+          <div class="mt-2 text-xs text-cyan-300">Galeria online vinculada</div>
+          {% endif %}
+        </a>
+        {% endfor %}
+      </div>
+    </article>
+  </section>
+
+  <aside>
+    <article class="tc3d-panel sticky top-4">
+      <div class="mb-4">
+        <p class="tc3d-label">Nuevo cliente</p>
+        <h2 class="text-xl font-semibold">Crear ficha cliente</h2>
+      </div>
+      <form id="client-form" class="space-y-3">
+        <input class="tc3d-input" type="text" name="name" placeholder="Nombre cliente" required />
+        <input class="tc3d-input" type="text" name="contact_person" placeholder="Persona de contacto" />
+        <input class="tc3d-input" type="email" name="email" placeholder="Email" />
+        <input class="tc3d-input" type="text" name="phone" placeholder="Telefono" />
+        <input class="tc3d-input" type="text" name="city" placeholder="Ciudad" />
+        <input class="tc3d-input" type="url" name="gallery_url" placeholder="URL galeria online" />
+        <textarea class="tc3d-input min-h-24" name="notes" placeholder="Notas del cliente"></textarea>
+        <button class="tc3d-button w-full" type="submit">Crear cliente</button>
+      </form>
+    </article>
+  </aside>
+</main>
+
+<script>
+  const clientForm = document.getElementById("client-form");
+
+  clientForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const formData = new FormData(clientForm);
+    const response = await fetch("/api/clients", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await response.json();
+    if (response.ok && data.client_id) {
+      window.location.href = `/clients/${data.client_id}`;
+    }
+  });
+</script>
+{% endblock %}
+

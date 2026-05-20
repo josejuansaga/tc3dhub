@@ -70,9 +70,22 @@ def ensure_database() -> None:
                 notes TEXT DEFAULT '',
                 FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
             );
+
+            CREATE TABLE IF NOT EXISTS clients (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                contact_person TEXT DEFAULT '',
+                email TEXT DEFAULT '',
+                phone TEXT DEFAULT '',
+                city TEXT DEFAULT '',
+                gallery_url TEXT DEFAULT '',
+                notes TEXT DEFAULT '',
+                created_at TEXT DEFAULT ''
+            );
             """
         )
         ensure_project_columns(cursor)
+        ensure_client_links(cursor)
         connection.commit()
         seed_data(connection)
 
@@ -99,6 +112,36 @@ def ensure_project_columns(cursor: sqlite3.Cursor) -> None:
         """
         UPDATE projects
         SET due_date = COALESCE(NULLIF(due_date, ''), delivery_date)
+        """
+    )
+
+
+def ensure_client_links(cursor: sqlite3.Cursor) -> None:
+    columns = {
+        row[1] for row in cursor.execute("PRAGMA table_info(projects)").fetchall()
+    }
+    if "client_id" not in columns:
+        cursor.execute("ALTER TABLE projects ADD COLUMN client_id INTEGER")
+
+    project_clients = cursor.execute(
+        "SELECT DISTINCT client FROM projects WHERE COALESCE(client, '') != ''"
+    ).fetchall()
+    for row in project_clients:
+        name = row[0]
+        cursor.execute(
+            """
+            INSERT OR IGNORE INTO clients (name, created_at)
+            VALUES (?, COALESCE(date('now'), ''))
+            """,
+            (name,),
+        )
+    cursor.execute(
+        """
+        UPDATE projects
+        SET client_id = (
+            SELECT id FROM clients WHERE clients.name = projects.client
+        )
+        WHERE client_id IS NULL AND COALESCE(client, '') != ''
         """
     )
 
@@ -247,6 +290,19 @@ def seed_data(connection: sqlite3.Connection) -> None:
             """,
             [row for row in task_rows if row[0] is not None],
         )
+
+    cursor.execute(
+        """
+        UPDATE clients
+        SET gallery_url = CASE name
+            WHEN 'Promociones Rivera' THEN 'https://example.com/galeria/rivera'
+            WHEN 'Estudio Armonia' THEN 'https://example.com/galeria/armonia'
+            WHEN 'Habita Norte' THEN 'https://example.com/galeria/habita-norte'
+            ELSE gallery_url
+        END
+        WHERE COALESCE(gallery_url, '') = ''
+        """
+    )
 
     connection.commit()
 

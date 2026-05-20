@@ -28,6 +28,14 @@ TASK_COLUMNS = [
 ]
 
 
+def fetch_clients_simple() -> list[dict]:
+    with get_connection() as connection:
+        clients = connection.execute(
+            "SELECT * FROM clients ORDER BY name COLLATE NOCASE ASC"
+        ).fetchall()
+    return [dict(client) for client in clients]
+
+
 def fetch_dashboard_data() -> dict:
     with get_connection() as connection:
         company = connection.execute(
@@ -87,7 +95,12 @@ def fetch_dashboard_data() -> dict:
 def fetch_projects_data() -> dict:
     with get_connection() as connection:
         projects = connection.execute(
-            "SELECT * FROM projects ORDER BY COALESCE(NULLIF(due_date, ''), '9999-12-31') ASC, id DESC"
+            """
+            SELECT p.*, c.id AS linked_client_id, c.gallery_url AS client_gallery_url
+            FROM projects p
+            LEFT JOIN clients c ON c.id = p.client_id
+            ORDER BY COALESCE(NULLIF(p.due_date, ''), '9999-12-31') ASC, p.id DESC
+            """
         ).fetchall()
 
     project_list = [dict(project) for project in projects]
@@ -100,13 +113,19 @@ def fetch_projects_data() -> dict:
         "projects": project_list,
         "project_board": project_board,
         "project_columns": PROJECT_COLUMNS,
+        "clients": fetch_clients_simple(),
     }
 
 
 def fetch_project_detail(project_id: int) -> dict:
     with get_connection() as connection:
         project = connection.execute(
-            "SELECT * FROM projects WHERE id = ?",
+            """
+            SELECT p.*, c.id AS linked_client_id, c.gallery_url AS client_gallery_url
+            FROM projects p
+            LEFT JOIN clients c ON c.id = p.client_id
+            WHERE p.id = ?
+            """,
             (project_id,),
         ).fetchone()
         if not project:
@@ -132,7 +151,62 @@ def fetch_project_detail(project_id: int) -> dict:
         "task_list": task_list,
         "task_board": task_board,
         "task_columns": TASK_COLUMNS,
+        "clients": fetch_clients_simple(),
     }
+
+
+def fetch_clients_data() -> dict:
+    with get_connection() as connection:
+        clients = connection.execute(
+            """
+            SELECT
+                c.*,
+                COUNT(p.id) AS project_count
+            FROM clients c
+            LEFT JOIN projects p ON p.client_id = c.id
+            GROUP BY c.id
+            ORDER BY c.name COLLATE NOCASE ASC
+            """
+        ).fetchall()
+
+    return {"clients": [dict(client) for client in clients]}
+
+
+def fetch_client_detail(client_id: int) -> dict:
+    with get_connection() as connection:
+        client = connection.execute(
+            "SELECT * FROM clients WHERE id = ?",
+            (client_id,),
+        ).fetchone()
+        if not client:
+            raise HTTPException(status_code=404, detail="Cliente no encontrado")
+
+        projects = connection.execute(
+            """
+            SELECT *
+            FROM projects
+            WHERE client_id = ?
+            ORDER BY COALESCE(NULLIF(due_date, ''), '9999-12-31') ASC, id DESC
+            """,
+            (client_id,),
+        ).fetchall()
+
+    return {
+        "client": dict(client),
+        "projects": [dict(project) for project in projects],
+    }
+
+
+def resolve_client_data(connection, client_id: int | None, client_name: str) -> tuple[int | None, str]:
+    normalized_name = client_name.strip()
+    if client_id:
+        client = connection.execute(
+            "SELECT id, name FROM clients WHERE id = ?",
+            (client_id,),
+        ).fetchone()
+        if client:
+            return client["id"], client["name"]
+    return (None, normalized_name)
 
 
 @app.on_event("startup")
@@ -176,6 +250,32 @@ def project_detail_page(request: Request, project_id: int):
     )
 
 
+@app.get("/clients", response_class=HTMLResponse)
+def clients_page(request: Request):
+    clients_data = fetch_clients_data()
+    return templates.TemplateResponse(
+        request=request,
+        name="clients.html",
+        context={
+            "clients_data": clients_data,
+            "app_name": os.getenv("APP_NAME", "TC3D Hub"),
+        },
+    )
+
+
+@app.get("/clients/{client_id}", response_class=HTMLResponse)
+def client_detail_page(request: Request, client_id: int):
+    detail = fetch_client_detail(client_id)
+    return templates.TemplateResponse(
+        request=request,
+        name="client_detail.html",
+        context={
+            "detail": detail,
+            "app_name": os.getenv("APP_NAME", "TC3D Hub"),
+        },
+    )
+
+
 @app.get("/api/dashboard")
 def get_dashboard():
     return fetch_dashboard_data()
@@ -183,6 +283,7 @@ def get_dashboard():
 
 @app.post("/api/projects")
 def create_project(
+    client_id: int = Form(0),
     client: str = Form(...),
     project_name: str = Form(...),
     status: str = Form(...),
@@ -194,15 +295,19 @@ def create_project(
 ):
     created_at = date.today().isoformat()
     with get_connection() as connection:
+        resolved_client_id, resolved_client_name = resolve_client_data(
+            connection, client_id or None, client
+        )
         cursor = connection.cursor()
         cursor.execute(
             """
             INSERT INTO projects (
-                client, project_name, status, delivery_date, amount, notes, description, folder_path, created_at, due_date
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                client, client_id, project_name, status, delivery_date, amount, notes, description, folder_path, created_at, due_date
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                client,
+                resolved_client_name,
+                resolved_client_id,
                 project_name,
                 status,
                 due_date,
@@ -233,6 +338,7 @@ def update_project_status(project_id: int, status: str = Form(...)):
 @app.post("/api/projects/{project_id}")
 def update_project(
     project_id: int,
+    client_id: int = Form(0),
     client: str = Form(...),
     project_name: str = Form(...),
     status: str = Form(...),
@@ -243,15 +349,19 @@ def update_project(
     folder_path: str = Form(""),
 ):
     with get_connection() as connection:
+        resolved_client_id, resolved_client_name = resolve_client_data(
+            connection, client_id or None, client
+        )
         connection.execute(
             """
             UPDATE projects
-            SET client = ?, project_name = ?, status = ?, delivery_date = ?,
+            SET client = ?, client_id = ?, project_name = ?, status = ?, delivery_date = ?,
                 amount = ?, notes = ?, description = ?, folder_path = ?
             WHERE id = ?
             """,
             (
-                client,
+                resolved_client_name,
+                resolved_client_id,
                 project_name,
                 status,
                 due_date,
@@ -268,6 +378,60 @@ def update_project(
         )
         connection.commit()
     return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+
+
+@app.post("/api/clients")
+def create_client(
+    name: str = Form(...),
+    contact_person: str = Form(""),
+    email: str = Form(""),
+    phone: str = Form(""),
+    city: str = Form(""),
+    gallery_url: str = Form(""),
+    notes: str = Form(""),
+):
+    created_at = date.today().isoformat()
+    with get_connection() as connection:
+        cursor = connection.cursor()
+        cursor.execute(
+            """
+            INSERT INTO clients (
+                name, contact_person, email, phone, city, gallery_url, notes, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (name, contact_person, email, phone, city, gallery_url, notes, created_at),
+        )
+        client_id = cursor.lastrowid
+        connection.commit()
+    return JSONResponse({"ok": True, "client_id": client_id})
+
+
+@app.post("/api/clients/{client_id}")
+def update_client(
+    client_id: int,
+    name: str = Form(...),
+    contact_person: str = Form(""),
+    email: str = Form(""),
+    phone: str = Form(""),
+    city: str = Form(""),
+    gallery_url: str = Form(""),
+    notes: str = Form(""),
+):
+    with get_connection() as connection:
+        connection.execute(
+            """
+            UPDATE clients
+            SET name = ?, contact_person = ?, email = ?, phone = ?, city = ?, gallery_url = ?, notes = ?
+            WHERE id = ?
+            """,
+            (name, contact_person, email, phone, city, gallery_url, notes, client_id),
+        )
+        connection.execute(
+            "UPDATE projects SET client = ? WHERE client_id = ?",
+            (name, client_id),
+        )
+        connection.commit()
+    return RedirectResponse(url=f"/clients/{client_id}", status_code=303)
 
 
 @app.post("/api/projects/{project_id}/tasks")

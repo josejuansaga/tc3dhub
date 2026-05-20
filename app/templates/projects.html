@@ -87,7 +87,13 @@
       </div>
 
       <form id="project-form" class="space-y-3">
-        <input class="tc3d-input" type="text" name="client" placeholder="Cliente" required />
+        <select class="tc3d-input" name="client_id">
+          <option value="0">Sin vincular</option>
+          {% for client in projects_data.clients %}
+          <option value="{{ client.id }}">{{ client.name }}</option>
+          {% endfor %}
+        </select>
+        <input class="tc3d-input" type="text" name="client" placeholder="Nombre cliente visible" required />
         <input class="tc3d-input" type="text" name="project_name" placeholder="Proyecto" required />
         <select class="tc3d-input" name="status" required>
           {% for status_name in projects_data.project_columns %}

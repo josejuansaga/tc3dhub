@@ -11,6 +11,12 @@
       </div>
 
       <form action="/api/projects/{{ detail.project.id }}" method="post" class="space-y-3">
+        <select class="tc3d-input" name="client_id">
+          <option value="0">Sin vincular</option>
+          {% for client in detail.clients %}
+          <option value="{{ client.id }}" {% if detail.project.client_id == client.id or detail.project.linked_client_id == client.id %}selected{% endif %}>{{ client.name }}</option>
+          {% endfor %}
+        </select>
         <input class="tc3d-input" type="text" name="client" value="{{ detail.project.client }}" required />
         <input class="tc3d-input" type="text" name="project_name" value="{{ detail.project.project_name }}" required />
         <select class="tc3d-input" name="status" required>
@@ -33,6 +39,12 @@
 
       {% if detail.project.folder_path %}
       <a href="{{ detail.project.folder_path }}" target="_blank" class="tc3d-button tc3d-button-secondary mt-3 block text-center">Abrir carpeta de trabajo</a>
+      {% endif %}
+      {% if detail.project.linked_client_id %}
+      <a href="/clients/{{ detail.project.linked_client_id }}" class="tc3d-nav mt-3 inline-flex">Abrir ficha cliente</a>
+      {% endif %}
+      {% if detail.project.client_gallery_url %}
+      <a href="{{ detail.project.client_gallery_url }}" target="_blank" class="tc3d-nav mt-3 inline-flex">Abrir galeria online</a>
       {% endif %}
     </article>
 
