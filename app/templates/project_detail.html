@@ -33,11 +33,19 @@
 
     <article class="tc3d-panel">
       <div class="mb-4">
-        <p class="tc3d-label">Nueva tarjeta</p>
-        <h2 class="text-xl font-semibold">Anadir tarea</h2>
+        <p class="tc3d-label">Entrada rapida</p>
+        <h2 class="text-xl font-semibold">Anadir tareas como Trello</h2>
       </div>
       <form id="project-task-form" class="space-y-3">
-        <input class="tc3d-input" type="text" name="title" placeholder="Titulo de la tarea" required />
+        <input
+          id="quick-task-input"
+          class="tc3d-input"
+          type="text"
+          name="title"
+          placeholder="Escribe una tarea y pulsa Enter"
+          autocomplete="off"
+          required
+        />
         <select class="tc3d-input" name="status" required>
           {% for status_name in detail.task_columns %}
           <option value="{{ status_name }}">{{ status_name }}</option>
@@ -45,6 +53,7 @@
         </select>
         <textarea class="tc3d-input min-h-24" name="notes" placeholder="Notas de la tarea"></textarea>
         <button class="tc3d-button w-full" type="submit">Crear tarjeta</button>
+        <p class="text-xs text-slate-500">Pulsa `Enter` en el titulo para crear rapido y seguir escribiendo.</p>
       </form>
     </article>
   </aside>
@@ -63,9 +72,9 @@
         <section class="rounded-2xl border border-slate-800 bg-slate-950/70 p-3">
           <div class="mb-3 flex items-center justify-between">
             <h3 class="font-medium">{{ column }}</h3>
-            <span class="text-xs text-slate-500">{{ items|length }}</span>
+            <span class="text-xs text-slate-500 task-column-count">{{ items|length }}</span>
           </div>
-          <div class="space-y-3">
+          <div class="space-y-3 task-column-list" data-column-name="{{ column }}">
             {% for task in items %}
             <article class="tc3d-board-card">
               <div class="text-sm font-medium">{{ task.title }}</div>
@@ -121,21 +130,11 @@
 
 <script>
   const projectTaskForm = document.getElementById("project-task-form");
+  const quickTaskInput = document.getElementById("quick-task-input");
+  const notesInput = projectTaskForm.querySelector('[name="notes"]');
+  const statusInput = projectTaskForm.querySelector('[name="status"]');
 
-  projectTaskForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const formData = new FormData(projectTaskForm);
-    const response = await fetch("/api/projects/{{ detail.project.id }}/tasks", {
-      method: "POST",
-      body: formData,
-    });
-
-    if (response.ok) {
-      window.location.reload();
-    }
-  });
-
-  document.querySelectorAll(".project-task-status-form select").forEach((select) => {
+  function bindTaskStatusSelect(select) {
     select.addEventListener("change", async () => {
       const form = select.closest(".project-task-status-form");
       const formData = new FormData();
@@ -146,6 +145,96 @@
       });
       window.location.reload();
     });
+  }
+
+  function buildTaskCard(task) {
+    const article = document.createElement("article");
+    article.className = "tc3d-board-card";
+
+    const title = document.createElement("div");
+    title.className = "text-sm font-medium";
+    title.textContent = task.title;
+    article.appendChild(title);
+
+    if (task.notes) {
+      const notes = document.createElement("div");
+      notes.className = "mt-2 text-xs text-slate-500";
+      notes.textContent = task.notes;
+      article.appendChild(notes);
+    }
+
+    const form = document.createElement("form");
+    form.className = "project-task-status-form mt-3";
+    form.dataset.taskId = task.id;
+
+    const select = document.createElement("select");
+    select.name = "status";
+    select.className = "tc3d-input text-sm";
+
+    {{ detail.task_columns | tojson }}.forEach((columnName) => {
+      const option = document.createElement("option");
+      option.value = columnName;
+      option.textContent = columnName;
+      if (columnName === task.status) {
+        option.selected = true;
+      }
+      select.appendChild(option);
+    });
+
+    form.appendChild(select);
+    article.appendChild(form);
+    bindTaskStatusSelect(select);
+    return article;
+  }
+
+  function incrementColumnCount(columnName) {
+    const list = document.querySelector(`.task-column-list[data-column-name="${columnName}"]`);
+    if (!list) return;
+    const countNode = list.parentElement.querySelector(".task-column-count");
+    countNode.textContent = String(Number(countNode.textContent || "0") + 1);
+  }
+
+  async function submitQuickTask(keepWriting = false) {
+    const formData = new FormData(projectTaskForm);
+    const response = await fetch("/api/projects/{{ detail.project.id }}/tasks", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (keepWriting) {
+        const list = document.querySelector(`.task-column-list[data-column-name="${data.task.status}"]`);
+        if (list) {
+          list.appendChild(buildTaskCard(data.task));
+          incrementColumnCount(data.task.status);
+        }
+        const currentStatus = statusInput.value;
+        projectTaskForm.reset();
+        statusInput.value = currentStatus;
+        notesInput.value = "";
+        quickTaskInput.focus();
+      } else {
+        window.location.reload();
+      }
+    }
+  }
+
+  projectTaskForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await submitQuickTask(false);
   });
+
+  quickTaskInput.addEventListener("keydown", async (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      if (!quickTaskInput.value.trim()) {
+        return;
+      }
+      await submitQuickTask(true);
+    }
+  });
+
+  document.querySelectorAll(".project-task-status-form select").forEach(bindTaskStatusSelect);
 </script>
 {% endblock %}

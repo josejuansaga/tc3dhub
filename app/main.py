@@ -275,8 +275,19 @@ def create_project_task(
             """,
             (project_id, title, status, notes),
         )
+        task_id = connection.execute("SELECT last_insert_rowid()").fetchone()[0]
         connection.commit()
-    return JSONResponse({"ok": True})
+    return JSONResponse(
+        {
+            "ok": True,
+            "task": {
+                "id": task_id,
+                "title": title,
+                "status": status,
+                "notes": notes,
+            },
+        }
+    )
 
 
 @app.post("/api/project-tasks/{task_id}/status")
