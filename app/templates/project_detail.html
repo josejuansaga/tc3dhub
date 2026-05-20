@@ -259,8 +259,10 @@
   }
 
   function bindTaskCardDrag(card) {
-    card.addEventListener("dragstart", () => {
+    card.addEventListener("dragstart", (event) => {
       draggedTaskCard = card;
+      event.dataTransfer.setData("text/plain", card.dataset.taskId);
+      event.dataTransfer.effectAllowed = "move";
       card.classList.add("tc3d-dragging");
     });
 
@@ -386,6 +388,10 @@
       event.preventDefault();
       const zone = columnList.closest(".task-drop-zone");
       zone.classList.remove("tc3d-drop-active");
+      const draggedTaskId = event.dataTransfer.getData("text/plain");
+      if (!draggedTaskCard && draggedTaskId) {
+        draggedTaskCard = document.querySelector(`.task-card[data-task-id="${draggedTaskId}"]`);
+      }
       if (!draggedTaskCard) return;
 
       const previousList = draggedTaskCard.closest(".task-column-list");

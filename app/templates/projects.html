@@ -122,8 +122,10 @@
   }
 
   function bindProjectCardDrag(card) {
-    card.addEventListener("dragstart", () => {
+    card.addEventListener("dragstart", (event) => {
       draggedProjectCard = card;
+      event.dataTransfer.setData("text/plain", card.dataset.projectId);
+      event.dataTransfer.effectAllowed = "move";
       card.classList.add("tc3d-dragging");
     });
 
@@ -179,6 +181,10 @@
       event.preventDefault();
       const zone = columnList.closest(".project-drop-zone");
       zone.classList.remove("tc3d-drop-active");
+      const draggedProjectId = event.dataTransfer.getData("text/plain");
+      if (!draggedProjectCard && draggedProjectId) {
+        draggedProjectCard = document.querySelector(`.project-card[data-project-id="${draggedProjectId}"]`);
+      }
       if (!draggedProjectCard) return;
 
       const previousList = draggedProjectCard.closest(".project-column-list");
